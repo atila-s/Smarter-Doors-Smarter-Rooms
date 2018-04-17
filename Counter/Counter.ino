@@ -28,7 +28,7 @@ int initialInside, initialOutside;
 int initDist_1, initDist_2, doorWidth;
 
 int peopleCount = 0;
-int peopleThreshold = 3; // Threshold for width of one person
+int peopleThreshold = 5; // Threshold for width of one person
 int deltaPerson;
 
 bool *x1, *x2; // Laser order in terms of break time
@@ -157,6 +157,7 @@ void state_5(){
     return;
   } else if (*x1 && *x2){
   	deltaPerson++;
+    state_4();
   	return;
   }
   Serial.println("ERROR : State 5 got out bound");
@@ -174,7 +175,7 @@ void state_6(){
     resetParameters();
     return;
   } else if (*x1 && *x2){
-    state_4();
+    state_4(); 
     return;
   }
   Serial.println("ERROR : State 6 got out bound");
@@ -311,7 +312,7 @@ int ultrasonDist(int trigPin, int echoPin){
     digitalWrite(trigPin, LOW);
     delayMicroseconds(2);
     digitalWrite(trigPin, HIGH);
-    delayMicroseconds(10);
+    delayMicroseconds(10); 
     digitalWrite(trigPin, LOW);
     long duration = pulseIn(echoPin, HIGH);
     int distance = duration/58.2;
