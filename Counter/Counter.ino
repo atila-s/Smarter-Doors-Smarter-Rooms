@@ -28,7 +28,7 @@ int initialInside, initialOutside;
 int initDist_1, initDist_2, doorWidth;
 
 int peopleCount = 0;
-int peopleThreshold = 5; // Threshold for width of one person
+int peopleThreshold = 65; // Threshold for width of one person
 int deltaPerson;
 
 bool *x1, *x2; // Laser order in terms of break time
@@ -69,9 +69,9 @@ void loop() {
   }
 
 void state_1(){ 
-  //Serial.println("STATE 1");
-  //Serial.println(*x1);
-  //Serial.println(*x2);
+  Serial.println("STATE 1");
+  Serial.println(*x1);
+  Serial.println(*x2);
   while(*x1 && !*x2){
     checkLasers();
   }
@@ -88,12 +88,16 @@ void state_1(){
 }
 
 void state_2(){
-  //Serial.println("STATE 2");
-  //Serial.println(*x1);
-  //Serial.println(*x2);
+  Serial.println("STATE 2");
+  Serial.println(*x1);
+  Serial.println(*x2);
+  int temp = 0;
   while(*x1 && *x2){
     checkLasers();
-    checkDistance();
+    if(temp % 2 == 0){
+      checkDistance();
+    }
+    temp++;
   }
   if(!*x1 && *x2){
     state_3();
@@ -104,17 +108,19 @@ void state_2(){
     return;
   }
   Serial.println("ERROR : State 2 got out bound");
+  Serial.println(*x1);
+  Serial.println(*x2);
 }
 
 void state_3(){
-  //Serial.println("STATE 3");
-  //Serial.println(*x1);
-  //Serial.println(*x2);
+  Serial.println("STATE 3");
+  Serial.println(*x1);
+  Serial.println(*x2);
   while(!*x1 && *x2){
     checkLasers();
   }
   if(*x1 && *x2){
-  	deltaPerson = 2;
+    deltaPerson = 2;
     state_4();
     return;
   } else if (!*x1 && !*x2) {
@@ -127,9 +133,9 @@ void state_3(){
 }
 
 void state_4(){
-  //Serial.println("STATE 4");
-  //Serial.println(*x1);
-  //Serial.println(*x2);
+  Serial.println("STATE 4");
+  Serial.println(*x1);
+  Serial.println(*x2);
   while(*x1 && *x2){
     checkLasers();
   }
@@ -144,9 +150,9 @@ void state_4(){
 }
 
 void state_5(){
-  //Serial.println("STATE 5");
-  //Serial.println(*x1);
-  //Serial.println(*x2);
+  Serial.println("STATE 5");
+  Serial.println(*x1);
+  Serial.println(*x2);
   while(!*x1 && *x2){
     checkLasers();
   }
@@ -156,17 +162,17 @@ void state_5(){
     resetParameters();
     return;
   } else if (*x1 && *x2){
-  	deltaPerson++;
+    deltaPerson++;
     state_4();
-  	return;
+    return;
   }
   Serial.println("ERROR : State 5 got out bound");
 }
 
 void state_6(){
-  //Serial.println("STATE 6");
-  //Serial.println(*x1);
-  //Serial.println(*x2);
+  Serial.println("STATE 6");
+  Serial.println(*x1);
+  Serial.println(*x2);
   while(*x1 && !*x2){
     checkLasers();
   }
@@ -175,22 +181,54 @@ void state_6(){
     resetParameters();
     return;
   } else if (*x1 && *x2){
-    state_4(); 
+    state_4(); // Takilmasin diye
     return;
   }
   Serial.println("ERROR : State 6 got out bound");
 }
 
 void checkLasers(){
-  if(analogRead(photoRes_Ins)*(0.9) < initialInside*0.8){
-    laserInsBreak = true;
+  if (laserAssign == 1){ //x1 = out
+    if(analogRead(photoRes_Out)*(0.9) < initialOutside*0.8){
+      if(laserOutBreak == false){
+          laserOutBreak = true;
+          return;
+        }
+    } else if(laserOutBreak == true){
+        laserOutBreak = false;
+        return;
+    }
+
+    if(analogRead(photoRes_Ins)*(0.9) < initialInside*0.8){
+      if(laserInsBreak == false){
+        laserInsBreak = true;
+        return;
+      }
+    } else if(laserInsBreak == true){
+        laserInsBreak = false;
+        return;
+      }
   } else {
-    laserInsBreak = false;
-  }
-  if(analogRead(photoRes_Out)*(0.9) < initialOutside*0.8){
-    laserOutBreak = true;
-  } else {
-    laserOutBreak = false;
+
+    if(analogRead(photoRes_Ins)*(0.9) < initialInside*0.8){
+      if(laserInsBreak == false){
+          laserInsBreak = true;
+          return;
+        }
+    } else if(laserInsBreak == true){
+        laserInsBreak = false;
+        return;
+    }
+
+    if(analogRead(photoRes_Out)*(0.9) < initialOutside*0.8){
+      if(laserOutBreak == false){
+        laserOutBreak = true;
+        return;
+      }
+    } else if(laserOutBreak == true){
+        laserOutBreak = false;
+        return;
+      }
   }
 }
 
@@ -201,28 +239,29 @@ void checkDistance(){
   
   int deltaDist = 0;
   int dist_1 = ultrasonDist(trigPin_1, echoPin_1);
-  while(dist_1 > initDist_1*0.9){
+  //while(dist_1 > initDist_1*0.9){
+  while(dist_1 > initDist_1){
     dist_1 = ultrasonDist(trigPin_1, echoPin_1);
   }
   Serial.println("---------");
+  Serial.println(dist_1);
+  Serial.println("---------");
   int dist_2 = ultrasonDist(trigPin_2, echoPin_2);
-  while(dist_2 > initDist_1*0.9){
+  //while(dist_2 > initDist_1*0.9){
+  while(dist_2 > initDist_2){  
     dist_2 = ultrasonDist(trigPin_2, echoPin_2);
   }
   deltaDist = doorWidth - (dist_1 + dist_2); 
   if(deltaDist < 0) {
     deltaDist = 0; 
   }
+  Serial.println(dist_2);
   Serial.print("deltaDist: ");
   Serial.println(deltaDist);
-  int tempDelta;
   if(deltaDist > peopleThreshold){
-    tempDelta = 2;
+    deltaPerson = 2;
   } else {
-    tempDelta = 1;
-  }
-  if(tempDelta > deltaPerson){
-    deltaPerson = tempDelta;
+    deltaPerson = 1;
   }
 }
 
@@ -305,18 +344,18 @@ void calibrateValues(){
   lcd.print("Door Width:");
   lcd.setCursor(13, 1);
   lcd.print(doorWidth);
-  delay(5000);
+  delay(2000);
 }
 
 int ultrasonDist(int trigPin, int echoPin){
-    digitalWrite(trigPin, LOW);
-    delayMicroseconds(2);
+    //digitalWrite(trigPin, LOW);
+    //delayMicroseconds(2);
     digitalWrite(trigPin, HIGH);
     delayMicroseconds(10); 
     digitalWrite(trigPin, LOW);
     long duration = pulseIn(echoPin, HIGH);
     int distance = duration/58.2;
-    delay(60);
+    delay(10);
     return distance;
 }
 
