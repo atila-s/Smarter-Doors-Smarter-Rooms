@@ -1,41 +1,41 @@
-#include <Vector.h>
-#include <LiquidCrystal.h>//Setting Up Liquid Crystal
+ #include <Vector.h>
+#include <LiquidCrystal.h>  // Setting Up Liquid Crystal
 
-//PINS AND VARIABLES
-//---------------------------
-
+// PINS AND VARIABLES
 const int rs = 12, en = 11, d4 = 5, d5 = 4, d6 = 3, d7 = 2;
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
+int calibDataAmount = 5;
 
-//PhotoResistor_Inside
+// PhotoResistor_Inside Pin and Variables
 int photoRes_Ins = A5;
 bool laserInsBreak = false;
+int initialInside;
 
-//PhotoResistor_Outside
+// PhotoResistor_Outside Pin and Variables
 int photoRes_Out = A4;
 bool laserOutBreak = false;
+int initialOutside;
 
-//Ultrasonic Sensor 1
+// Ultrasonic Sensor 1 Pins and Variables
 int echoPin_1 = 9;
 int trigPin_1 = 8;
+int initDist_1;
 
-//Ultrasonic Sensor 2
+//Ultrasonic Sensor 2 Pins and Variables
 int echoPin_2 = 7;
 int trigPin_2 = 6;
+int initDist_2;
 
-//Global Variables for our system
-int initialInside, initialOutside;
-int initDist_1, initDist_2, doorWidth;
-
+// Global Variables for our system
+int doorWidth;
 int peopleCount = 0;
 int peopleThreshold = 65; // Threshold for width of one person
 int deltaPerson;
-
 bool *x1, *x2; // Laser order in terms of break time
 int laserAssign; // Keeps track of *x1 and *x2 assignment
 
 void setup() {
-  //Setting up Pins
+  // Setting up Pins
   pinMode(echoPin_1, INPUT);
   pinMode(trigPin_1, OUTPUT);
   pinMode(echoPin_2, INPUT);
@@ -45,24 +45,24 @@ void setup() {
   Serial.begin(9600);
   lcd.begin(16, 2);
   lcd.clear();
-  calibrateValues();
+  calibrateValues(); // Callibrate our initial values
   lcd.clear();
   displayCount();
 }
 
 void loop() {
-  //THIS IS STATE_0 
+  //This is state_0
   resetParameters();
   checkLasers();
   if(laserInsBreak){
     x1 = &laserInsBreak;
     x2 = &laserOutBreak;
-    laserAssign = -1; // Inside laser broken first
+    laserAssign = -1; // Inside laser bream broken first
     state_1();
   } else if(laserOutBreak){ 
     x1 = &laserOutBreak;
     x2 = &laserInsBreak;
-    laserAssign = 1; // Outside laser broken first
+    laserAssign = 1; // Outside laser bream broken first
     state_1();
   }
   displayCount();
@@ -79,8 +79,7 @@ void state_1(){
     state_2();
     return;
   } else if(!*x1 && !*x2){
-    //BAKIP CIKMA veya Ters Gecme yani sayi degismiyor
-    //Serial.println("SAYI DEGISMEDI!!");
+    // One person just having a look or two people crossing, no change in peopleCount
     resetParameters();
     return;
   }
@@ -103,8 +102,8 @@ void state_2(){
     state_3();
     return;
   } else if(*x1 && !*x2) {
-    //BAKIP CIKMA veya Ters Gecme olabilir biz gene bi bakalim
-    state_1(); 
+    // One person just having a look or two people crossing, no change in peopleCount
+    state_1(); // Better check it
     return;
   }
   Serial.println("ERROR : State 2 got out bound");
@@ -124,7 +123,7 @@ void state_3(){
     state_4();
     return;
   } else if (!*x1 && !*x2) {
-    //Bir veya iki kisi beraber gecti
+    // One person or two people passed
     peopleCount +=  laserAssign * deltaPerson;
     resetParameters();
     return;
@@ -157,7 +156,7 @@ void state_5(){
     checkLasers();
   }
   if(!*x1 && !*x2){
-    //Iki veya daha fazla kisi az zaman farkiyla gecti
+    // Two or more people passed with a small time difference
     peopleCount +=  laserAssign * deltaPerson;
     resetParameters();
     return;
@@ -177,18 +176,19 @@ void state_6(){
     checkLasers();
   }
   if(!*x1 && !*x2){
-    //Ters yonde gecildi
+    // Two people crossing
     resetParameters();
     return;
   } else if (*x1 && *x2){
-    state_4(); // Takilmasin diye
+    state_4(); // Not to stuck in an infinite loop
     return;
   }
   Serial.println("ERROR : State 6 got out bound");
 }
 
-void checkLasers(){
-  if (laserAssign == 1){ //x1 = out
+void checkLasers(){ 
+  // x1 has the priority to catch the time difference between laser beam boolean changes
+  if (laserAssign == 1){ // x1 is set to outside laser beam, so outside has the priority
     if(analogRead(photoRes_Out)*(0.9) < initialOutside*0.8){
       if(laserOutBreak == false){
           laserOutBreak = true;
@@ -198,7 +198,7 @@ void checkLasers(){
         laserOutBreak = false;
         return;
     }
-
+    // if not change in outside beam, check the outside
     if(analogRead(photoRes_Ins)*(0.9) < initialInside*0.8){
       if(laserInsBreak == false){
         laserInsBreak = true;
@@ -208,8 +208,7 @@ void checkLasers(){
         laserInsBreak = false;
         return;
       }
-  } else {
-
+  } else { // x1 is set to inside laser beam, so inside has the priority
     if(analogRead(photoRes_Ins)*(0.9) < initialInside*0.8){
       if(laserInsBreak == false){
           laserInsBreak = true;
@@ -219,7 +218,7 @@ void checkLasers(){
         laserInsBreak = false;
         return;
     }
-
+    // if not change in inside beam, check the outside
     if(analogRead(photoRes_Out)*(0.9) < initialOutside*0.8){
       if(laserOutBreak == false){
         laserOutBreak = true;
@@ -233,32 +232,31 @@ void checkLasers(){
 }
 
 void checkDistance(){
-  if(deltaPerson == 2){ 
+  if(deltaPerson == 2){ // For efficiency, it cannot be larger than that just return
       return;
   }
-  
-  int deltaDist = 0;
   int dist_1 = ultrasonDist(trigPin_1, echoPin_1);
-  //while(dist_1 > initDist_1*0.9){
-  while(dist_1 > initDist_1){
+  while(dist_1 > initDist_1){ // if the sensor measurement is invalid, re-measure
     dist_1 = ultrasonDist(trigPin_1, echoPin_1);
   }
+  
   Serial.println("---------");
   Serial.println(dist_1);
   Serial.println("---------");
+  
   int dist_2 = ultrasonDist(trigPin_2, echoPin_2);
-  //while(dist_2 > initDist_1*0.9){
-  while(dist_2 > initDist_2){  
+  while(dist_2 > initDist_2){  // if the sensor measurement is invalid, re-measure
     dist_2 = ultrasonDist(trigPin_2, echoPin_2);
   }
-  deltaDist = doorWidth - (dist_1 + dist_2); 
-  if(deltaDist < 0) {
+  int deltaDist = doorWidth - (dist_1 + dist_2); 
+  if(deltaDist < 0) { // boundary check, cannot be less than zero
     deltaDist = 0; 
   }
   Serial.println(dist_2);
+  Serial.println("---------");
   Serial.print("deltaDist: ");
   Serial.println(deltaDist);
-  if(deltaDist > peopleThreshold){
+  if(deltaDist > peopleThreshold){ // the width missing is wider than one person
     deltaPerson = 2;
   } else {
     deltaPerson = 1;
@@ -289,7 +287,7 @@ void calibrateValues(){
   lcd.print("Calibrating...");
 
   Serial.println("CALIBRATING");
-  //Calibrating Ultrasonic Sensors
+  
   Vector<int> tempData;
   for(int i=0;i<5;i++){
     int temp = ultrasonDist(trigPin_1, echoPin_1);
@@ -313,6 +311,7 @@ void calibrateValues(){
   }
   initDist_2 = mostRepeatedElement(tempData_2);
   doorWidth = (initDist_1 + initDist_2) / 2 ;
+  
   //Calibrating Lasers and Photoresistors
   Vector<int> tempData_3;
   for(int i=0;i<5;i++){
@@ -325,6 +324,7 @@ void calibrateValues(){
     tempData_3.push_back(temp);
   }
   initialInside = mostRepeatedElement(tempData_3);
+  
   
   Vector<int> tempData_4;
   for(int i=0;i<5;i++){
@@ -339,7 +339,7 @@ void calibrateValues(){
   Serial.println("BEGIN");
   Serial.print("Door Width:");
   Serial.println(doorWidth);
-
+  
   lcd.setCursor(1, 1);
   lcd.print("Door Width:");
   lcd.setCursor(13, 1);
@@ -360,6 +360,7 @@ int ultrasonDist(int trigPin, int echoPin){
 }
 
 int mostRepeatedElement(Vector<int> &myVec){
+  // takes a vetor of integers and returns the most repoeated integer in it's tolerance range 
   int bestIndex = 0;
   int maxRep = 0;
   for(int i=0; i<myVec.size()-maxRep; i++){
@@ -368,7 +369,7 @@ int mostRepeatedElement(Vector<int> &myVec){
        if(myVec[i]*(1.10) >= myVec[j] && myVec[i]*(0.9) <= myVec[j]){
         tempRep++;
        }
-      }
+    }
     if(tempRep > maxRep){
       maxRep = tempRep;
       bestIndex = i;
