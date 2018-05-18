@@ -1,18 +1,18 @@
- #include <Vector.h>
-#include <LiquidCrystal.h>  // Setting Up Liquid Crystal
+#include <Vector.h>
+#include <SPI.h>
+#include <Ethernet.h>
+#include <BlynkSimpleEthernet.h>
 
 // PINS AND VARIABLES
-const int rs = 12, en = 11, d4 = 5, d5 = 4, d6 = 3, d7 = 2;
-LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 int calibDataAmount = 5;
 
 // PhotoResistor_Inside Pin and Variables
-int photoRes_Ins = A5;
+int photoRes_Ins = A0;
 bool laserInsBreak = false;
 int initialInside;
 
 // PhotoResistor_Outside Pin and Variables
-int photoRes_Out = A4;
+int photoRes_Out = A1;
 bool laserOutBreak = false;
 int initialOutside;
 
@@ -26,6 +26,8 @@ int echoPin_2 = 7;
 int trigPin_2 = 6;
 int initDist_2;
 
+int lightEnable = 5; // Pin used to control Relay,HIGH=>Lights are turned off
+
 // Global Variables for our system
 int doorWidth;
 int peopleCount = 0;
@@ -34,6 +36,17 @@ int deltaPerson;
 bool *x1, *x2; // Laser order in terms of break time
 int laserAssign; // Keeps track of *x1 and *x2 assignment
 
+// Blynk Related Global Variables
+int resetPin, resetCount, emergencyPin; // Flags used by Reset and Emergency Buttons
+
+bool delayActive; // Flag for Delay and Neccessity of Relay control
+int delayPostpone;
+int delayAmount; // Parameters used to delay for required seconds
+
+WidgetLED resetLed(V14), lightLed(V15), alarmLed(V16), clearLed(V17);
+char auth[] = "cf2e633dd52241ad98537e83ed17985b"; // Our Blynk Token
+
+ 
 void setup() {
   // Setting up Pins
   pinMode(echoPin_1, INPUT);
@@ -42,27 +55,44 @@ void setup() {
   pinMode(trigPin_2, OUTPUT);
   pinMode(photoRes_Ins,INPUT);
   pinMode(photoRes_Out,INPUT);
+  pinMode(lightEnable, OUTPUT);
   Serial.begin(9600);
-  lcd.begin(16, 2);
-  lcd.clear();
+  Blynk.begin(auth);
+  Blynk.run();
   calibrateValues(); // Callibrate our initial values
-  lcd.clear();
   displayCount();
+  Blynk.virtualWrite(V6, "add", 7, "Exhibition Room", 0);
+  // Giving random room numbers for table view, used to show the future potential
+  Blynk.virtualWrite(V6, "add", 1, "Room Number", "Count");
+  Blynk.virtualWrite(V6, "add", 2, "Room 1", "xxxx");
+  Blynk.virtualWrite(V6, "add", 3, "Room 2", "xxxx");
+  Blynk.virtualWrite(V6, "add", 4, "Room 3", "xxxx");
+  Blynk.virtualWrite(V6, "add", 5, "Room 4", "xxxx");
+  Blynk.virtualWrite(V6, "add", 6, "Room 5", "xxxx");
+  Blynk.virtualWrite(V6, "add", 8, "Room 6", "xxxx");
+  Blynk.virtualWrite(V6, "pick", 1);
+  alarmLed.off();
 }
 
 void loop() {
-  //This is state_0
-  resetParameters();
+  Blynk.run(); // Runs the server communication with Blynk
+  if(resetPin != 0){
+    calibrateValues();
+    peopleCount = resetCount;
+    resetPin = 0;
+  }
+  resetParameters(); 
   checkLasers();
+  // State_0 Begins here
   if(laserInsBreak){
     x1 = &laserInsBreak;
     x2 = &laserOutBreak;
-    laserAssign = -1; // Inside laser bream broken first
+    laserAssign = -1; // Inside's laser bream broken first
     state_1();
   } else if(laserOutBreak){ 
     x1 = &laserOutBreak;
     x2 = &laserInsBreak;
-    laserAssign = 1; // Outside laser bream broken first
+    laserAssign = 1; // Outside's laser bream broken first
     state_1();
   }
   displayCount();
@@ -90,13 +120,10 @@ void state_2(){
   Serial.println("STATE 2");
   Serial.println(*x1);
   Serial.println(*x2);
-  int temp = 0;
+  
   while(*x1 && *x2){
     checkLasers();
-    if(temp % 2 == 0){
-      checkDistance();
-    }
-    temp++;
+    checkDistance();
   }
   if(!*x1 && *x2){
     state_3();
@@ -248,6 +275,8 @@ void checkDistance(){
   while(dist_2 > initDist_2){  // if the sensor measurement is invalid, re-measure
     dist_2 = ultrasonDist(trigPin_2, echoPin_2);
   }
+  Serial.println(dist_1);
+  Serial.println(dist_2);
   int deltaDist = doorWidth - (dist_1 + dist_2); 
   if(deltaDist < 0) { // boundary check, cannot be less than zero
     deltaDist = 0; 
@@ -271,26 +300,60 @@ void resetParameters(){
 }
 
 void displayCount(){
-  Serial.print("SHERLOCK COUNT: ");
+  Serial.print("People COUNT: ");
   Serial.println(peopleCount);
-
-  lcd.setCursor(0, 0);
-  lcd.print("Sherlock Counter");
-  lcd.setCursor(7, 1);
-  lcd.print("        ");
-  lcd.setCursor(7, 1);
-  lcd.print(peopleCount);
+  if(!delayActive && peopleCount != 0){
+    delayActive = true;
+    if(peopleCount > 0){
+      digitalWrite(lightEnable, LOW);
+      lightLed.on();
+    }
+  }
+  if(delayActive && peopleCount == 0){
+    if(delayPostpone == 0){
+      delayPostpone = millis() / 1000 + delayAmount;
+    } else {
+      if(millis() / 1000 >= delayPostpone){
+        digitalWrite(lightEnable, HIGH);
+        delayPostpone = 0;
+        delayActive = false;
+        lightLed.off();
+      }
+    }
+  }
+  if(emergencyPin == 1){
+    alarmLed.on();
+    emergencyPin++;
+    if(peopleCount <= 0){
+      emergencyPin = 0;
+      
+    }
+  }
+  if(emergencyPin == 2){
+    if(peopleCount <= 0){
+      emergencyPin = 0;
+      alarmLed.off();
+      clearLed.on();
+    }
+  }
+  
 }
 
 void calibrateValues(){
-  lcd.setCursor(2, 0);
-  lcd.print("Calibrating...");
-
+  clearLed.off();
+  if(resetCount == 0){
+    digitalWrite(lightEnable, HIGH);
+    lightLed.off();
+  } else{
+    digitalWrite(lightEnable, LOW);
+    lightLed.on();
+  }
   Serial.println("CALIBRATING");
-  
+  Blynk.virtualWrite(V2,"Calibrating");
   Vector<int> tempData;
   for(int i=0;i<5;i++){
     int temp = ultrasonDist(trigPin_1, echoPin_1);
+  Serial.println(temp);
     if(temp == 0){
       i--;
     }else{
@@ -300,9 +363,12 @@ void calibrateValues(){
   }
   initDist_1 = mostRepeatedElement(tempData);
   
+  Serial.println("------------");
+  
   Vector<int> tempData_2;
   for(int i=0;i<5;i++){
     int temp = ultrasonDist(trigPin_2, echoPin_2);
+  Serial.println(temp);
     if(temp == 0){
       i--;
     }else{
@@ -339,17 +405,13 @@ void calibrateValues(){
   Serial.println("BEGIN");
   Serial.print("Door Width:");
   Serial.println(doorWidth);
-  
-  lcd.setCursor(1, 1);
-  lcd.print("Door Width:");
-  lcd.setCursor(13, 1);
-  lcd.print(doorWidth);
+  Blynk.virtualWrite(V5,doorWidth);
   delay(2000);
+  Blynk.virtualWrite(V2,"SHERLOCK COUNTER:");
+  resetLed.off();
 }
 
 int ultrasonDist(int trigPin, int echoPin){
-    //digitalWrite(trigPin, LOW);
-    //delayMicroseconds(2);
     digitalWrite(trigPin, HIGH);
     delayMicroseconds(10); 
     digitalWrite(trigPin, LOW);
@@ -380,3 +442,39 @@ int mostRepeatedElement(Vector<int> &myVec){
   }
   return myVec[bestIndex];
 }
+
+BLYNK_READ(V0){
+  Blynk.virtualWrite(V0,peopleCount);
+  Blynk.virtualWrite(V6, "update", 7, "Exhibition Room", peopleCount);
+}
+
+BLYNK_WRITE(V1) //Button Widget is writing to pin V1
+{
+  if(resetPin == 0){
+    resetLed.on();
+    resetPin = param.asInt(); 
+  }
+}
+
+BLYNK_WRITE(V3) //Button Widget is writing to pin V1
+{
+  peopleThreshold = param.asInt(); 
+}
+
+BLYNK_WRITE(V4) //Button Widget is writing to pin V4
+{
+  resetCount = param.asInt(); 
+}
+
+BLYNK_WRITE(V11) //Button Widget is writing to pin V11
+{
+  delayAmount = param.asInt(); 
+}
+
+BLYNK_WRITE(V8) //Button Widget is writing to pin V8
+{
+  if(emergencyPin == 0){
+    emergencyPin = param.asInt(); 
+  }
+}
+
