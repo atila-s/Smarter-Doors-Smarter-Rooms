@@ -26,7 +26,7 @@ int echoPin_2 = 7;
 int trigPin_2 = 6;
 int initDist_2;
 
-int lightEnable = 5; // Pin used to control Relay,HIGH=>Lights are turned off
+int lightEnable = 5; // Pin used to control Relay, HIGH => Lights are turned off
 
 // Global Variables for our system
 int doorWidth;
@@ -53,8 +53,8 @@ void setup() {
   pinMode(trigPin_1, OUTPUT);
   pinMode(echoPin_2, INPUT);
   pinMode(trigPin_2, OUTPUT);
-  pinMode(photoRes_Ins,INPUT);
-  pinMode(photoRes_Out,INPUT);
+  pinMode(photoRes_Ins, INPUT);
+  pinMode(photoRes_Out, INPUT);
   pinMode(lightEnable, OUTPUT);
   Serial.begin(9600);
   Blynk.begin(auth);
@@ -109,8 +109,12 @@ void state_1(){
     state_2();
     return;
   } else if(!*x1 && !*x2){
-    // One person just having a look or two people crossing, no change in peopleCount
-    resetParameters();
+    if(deltaPerson == 2){ // One person stood in the entrance and one person has passed
+      peopleCount -= laserAssign;
+      resetParameters();
+    } else{ // One person just having a look or two people crossing, no change in peopleCount
+      resetParameters();
+    }
     return;
   }
   Serial.println("ERROR : State 1 got out bound");
@@ -172,7 +176,7 @@ void state_4(){
     state_6();
     return;
   }
-  Serial.println("ERROR : State 4 got out bound");
+  Serial.println("ERROR : State 4 got out bound" );
 }
 
 void state_5(){
@@ -275,13 +279,11 @@ void checkDistance(){
   while(dist_2 > initDist_2){  // if the sensor measurement is invalid, re-measure
     dist_2 = ultrasonDist(trigPin_2, echoPin_2);
   }
-  Serial.println(dist_1);
   Serial.println(dist_2);
   int deltaDist = doorWidth - (dist_1 + dist_2); 
   if(deltaDist < 0) { // boundary check, cannot be less than zero
     deltaDist = 0; 
   }
-  Serial.println(dist_2);
   Serial.println("---------");
   Serial.print("deltaDist: ");
   Serial.println(deltaDist);
@@ -336,7 +338,6 @@ void displayCount(){
       clearLed.on();
     }
   }
-  
 }
 
 void calibrateValues(){
@@ -391,7 +392,6 @@ void calibrateValues(){
   }
   initialInside = mostRepeatedElement(tempData_3);
   
-  
   Vector<int> tempData_4;
   for(int i=0;i<5;i++){
     int temp = analogRead(photoRes_Out)*(0.95);
@@ -405,7 +405,7 @@ void calibrateValues(){
   Serial.println("BEGIN");
   Serial.print("Door Width:");
   Serial.println(doorWidth);
-  Blynk.virtualWrite(V5,doorWidth);
+  Blynk.virtualWrite(V5, doorWidth);
   delay(2000);
   Blynk.virtualWrite(V2,"SHERLOCK COUNTER:");
   resetLed.off();
@@ -422,7 +422,7 @@ int ultrasonDist(int trigPin, int echoPin){
 }
 
 int mostRepeatedElement(Vector<int> &myVec){
-  // takes a vetor of integers and returns the most repoeated integer in it's tolerance range 
+  // takes a vetor of integers and returns the most repoeated integer in its tolerance range 
   int bestIndex = 0;
   int maxRep = 0;
   for(int i=0; i<myVec.size()-maxRep; i++){
@@ -443,12 +443,12 @@ int mostRepeatedElement(Vector<int> &myVec){
   return myVec[bestIndex];
 }
 
-BLYNK_READ(V0){
-  Blynk.virtualWrite(V0,peopleCount);
+BLYNK_READ(V0){ //Count Display Widget is connected to pin V0
+  Blynk.virtualWrite(V0, peopleCount);
   Blynk.virtualWrite(V6, "update", 7, "Exhibition Room", peopleCount);
 }
 
-BLYNK_WRITE(V1) //Button Widget is writing to pin V1
+BLYNK_WRITE(V1) //Reset Button Widget is writing to pin V1
 {
   if(resetPin == 0){
     resetLed.on();
@@ -456,25 +456,24 @@ BLYNK_WRITE(V1) //Button Widget is writing to pin V1
   }
 }
 
-BLYNK_WRITE(V3) //Button Widget is writing to pin V1
+BLYNK_WRITE(V3) //People Threshold Slider Widget is writing to pin V3
 {
   peopleThreshold = param.asInt(); 
 }
 
-BLYNK_WRITE(V4) //Button Widget is writing to pin V4
+BLYNK_WRITE(V4) //Reset Count InputWidget is connected to V4
 {
   resetCount = param.asInt(); 
 }
 
-BLYNK_WRITE(V11) //Button Widget is writing to pin V11
+BLYNK_WRITE(V11) //Delay Amount Slider Widget is writing to pin V11
 {
   delayAmount = param.asInt(); 
 }
 
-BLYNK_WRITE(V8) //Button Widget is writing to pin V8
+BLYNK_WRITE(V8) //Emergency Button Widget is writing to pin V8
 {
   if(emergencyPin == 0){
     emergencyPin = param.asInt(); 
   }
 }
-
