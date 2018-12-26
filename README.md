@@ -11,10 +11,9 @@ According to student observations, energy is used unnecessarily upon buildings w
 ### Under the hood:
 
 Possible cases occuring in our daily lives:
-(Two horizontal lines representing two lasers used)
+(Two horizontal lines representing two ultrasound sensors used)
 
-State Diagram used to identify and solve these cases: 
-
+![picture](https://github.com/Matiatus/Smarter-Doors-Smarter-Rooms/blob/master/images/Cases.png)
 
 ### Project Supported by
 
