@@ -15,6 +15,10 @@ Possible cases occuring in our daily lives:
 
 ![picture](https://github.com/Matiatus/Smarter-Doors-Smarter-Rooms/blob/master/images/Cases.png)
 
+State Diagram used to identify and solve these cases: 
+
+![](https://github.com/Matiatus/Smarter-Doors-Smarter-Rooms/blob/master/images/States.gif)
+
 ### Project Supported by
 
 * [Koç University](https://www.ku.edu.tr)
